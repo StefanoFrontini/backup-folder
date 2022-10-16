@@ -1,2 +1,5 @@
-sender
-receiver
+client/dataToBackup
+client/json
+client/node_modules
+server/backup
+server/node_modules
