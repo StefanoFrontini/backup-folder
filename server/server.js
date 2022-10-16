@@ -1,11 +1,13 @@
-// import fs from "fs";
+import { unlink } from "fs/promises";
 // import path from "path";
 import express from "express";
 
 const app = express();
 const PORT = 3000;
 
-// const backupDir = "backup";
+const client_url = "";
+
+const backupDir = "backup";
 
 // Middlewares
 app.use(express.json());
@@ -23,6 +25,19 @@ const getBackup = async (dir) => {
   } catch (error) {
     console.error(error);
   }
+};
+
+// const copyFile = async (src, dest) => {
+//   await fs.promises.copyFile(src, dest);
+// };
+const deleteFile = async (dir, file) => {
+  await unlink(path.join(dir, file));
+};
+
+const downloadFile = async (file) => {
+  const { data } = await axios.post(client_url, { fileName: file });
+  console.log("Client message: ", data);
+  return data;
 };
 
 // routes
@@ -70,6 +85,13 @@ app.post("/", async (req, res) => {
       console.log("File da eliminare: ", el);
     }
   }
+  const downloadFilePromises = () =>
+    filesToChange.filesToUpdate.map((el) => downloadFile(el));
+
+  const deleteFilePromises = () =>
+    filesToChange.filesToDelete.map((el) => deleteFile(backupDir, el));
+
+  await Promise.all([...downloadFilePromises(), ...deleteFilePromises()]);
   res.status(201).json({ success: true, msg: "Data received!" });
 });
 

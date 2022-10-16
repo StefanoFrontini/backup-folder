@@ -3,12 +3,17 @@ import { statSync } from "fs";
 import axios from "axios";
 
 import path from "path";
+import express from "express";
+
+const app = express();
+const PORT = 5000;
+
+// Middlewares
+app.use(express.json());
 
 const dataDir = "dataToBackup";
 
 const server_url = "http://localhost:3000";
-
-const PORT = 5000;
 
 const getDataToBackup = async (dir) => {
   try {
@@ -24,6 +29,19 @@ const getDataToBackup = async (dir) => {
     console.error(error);
   }
 };
+
+// routes
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
+
+app.post("/", (req, res) => {
+  res.send("Hello World!");
+});
+
+app.listen(PORT, () => {
+  console.log(`Listening on port ${PORT}`);
+});
 
 // const writeJson = async (dir, data) => {
 //   try {
@@ -63,35 +81,35 @@ const sendListOfFilesToUpdate = async () => {
   // const backup = await getBackup();
   // const filesToDelete = { ...backup };
   const dataToBackup = await getDataToBackup(dataDir);
-  console.log(dataToBackup);
-  for (let el of dataToBackup) {
-    if (el.name in backup) {
-      delete filesToDelete[el.name];
-    }
-    if (
-      el.name in backup &&
-      new Date(el.mtime) > new Date(backup[el.name].mtime)
-    ) {
-      filesToSend.filesToUpdate.push(el.name);
-      console.log(
-        `Trovato nuovo file più aggiornato: ${el.name} - ${
-          el.mtime
-        } - backup: ${backup[el.name].mtime}`
-      );
-    }
-    if (!(el.name in backup)) {
-      filesToSend.filesToUpdate.push(el.name);
-      console.log(`Trovato nuovo file: ${el.name}`);
-    }
-  }
-  const keysToDelete = Object.keys(filesToDelete);
-  if (keysToDelete.length > 0) {
-    for (let el of keysToDelete) {
-      filesToSend.filesToDelete.push(el);
-      // deleteFile(myBackupDir, el);
-      console.log("File da eliminare: ", el);
-    }
-  }
+
+  // for (let el of dataToBackup) {
+  //   if (el.name in backup) {
+  //     delete filesToDelete[el.name];
+  //   }
+  //   if (
+  //     el.name in backup &&
+  //     new Date(el.mtime) > new Date(backup[el.name].mtime)
+  //   ) {
+  //     filesToSend.filesToUpdate.push(el.name);
+  //     console.log(
+  //       `Trovato nuovo file più aggiornato: ${el.name} - ${
+  //         el.mtime
+  //       } - backup: ${backup[el.name].mtime}`
+  //     );
+  //   }
+  //   if (!(el.name in backup)) {
+  //     filesToSend.filesToUpdate.push(el.name);
+  //     console.log(`Trovato nuovo file: ${el.name}`);
+  //   }
+  // }
+  // const keysToDelete = Object.keys(filesToDelete);
+  // if (keysToDelete.length > 0) {
+  //   for (let el of keysToDelete) {
+  //     filesToSend.filesToDelete.push(el);
+  //     // deleteFile(myBackupDir, el);
+  //     console.log("File da eliminare: ", el);
+  //   }
+  // }
   const { data } = await axios.post(server_url, { data: dataToBackup });
   console.log("Server message: ", data);
 };
