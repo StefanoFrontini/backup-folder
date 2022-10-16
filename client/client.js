@@ -1,5 +1,5 @@
-import { readdir, writeFile, readFile } from "fs/promises";
-import { statSync } from "fs";
+import { readdir } from "fs/promises";
+import { statSync, createReadStream } from "fs";
 import axios from "axios";
 
 import path from "path";
@@ -13,7 +13,7 @@ app.use(express.json());
 
 const dataDir = "dataToBackup";
 
-const server_url = "http://localhost:3000";
+const server_url = "http://localhost:3000/";
 
 const getDataToBackup = async (dir) => {
   try {
@@ -31,12 +31,21 @@ const getDataToBackup = async (dir) => {
 };
 
 // routes
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-
-app.post("/", (req, res) => {
-  res.send("Hello World!");
+app.get("/api/query", (req, res) => {
+  const { filePath } = req.query;
+  if (!filePath) {
+    return res.status(404).send("Please provide a filepath");
+  }
+  const fileStream = createReadStream(path.join(dataDir, filePath));
+  fileStream.on("open", () => {
+    fileStream.pipe(res);
+  });
+  fileStream.on("error", () => {
+    res.end("error");
+  });
+  // fileStream.on("close", () => {
+  //   res.json({ success: true, msg: `File sent! ${filePath}` });
+  // });
 });
 
 app.listen(PORT, () => {
