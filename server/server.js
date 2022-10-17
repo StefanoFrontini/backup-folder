@@ -48,10 +48,10 @@ const deleteFile = async (dir, file) => {
   }
 };
 
-const downloadFile = async (file) => {
+const downloadFile = async (file, url) => {
   try {
     const { data } = await axios({
-      url: client_url,
+      url,
       method: "GET",
       responseType: "stream",
       params: { filePath: file },
@@ -71,7 +71,7 @@ const downloadFile = async (file) => {
       });
     });
   } catch (error) {
-    console.log(error.response.data);
+    console.log(error.response);
   }
 };
 // routes
@@ -85,7 +85,9 @@ app.post("/", async (req, res) => {
       .status(400)
       .json({ success: false, msg: "Non è stato inviato alcun dato" });
   }
-  data = data.filter((el) => el.name !== ".DS_Store");
+  const tunnel_url = data.tunnel_url;
+  console.log({ tunnel_url });
+  data = data.dataToBackup.filter((el) => el.name !== ".DS_Store");
   const filesToChange = {
     filesToUpdate: [],
     filesToDelete: [],
@@ -131,7 +133,7 @@ app.post("/", async (req, res) => {
     }
   }
   const downloadFilePromises = () =>
-    filesToChange.filesToUpdate.map((el) => downloadFile(el));
+    filesToChange.filesToUpdate.map((el) => downloadFile(el, tunnel_url));
 
   const deleteFilePromises = () =>
     filesToChange.filesToDelete.map((el) => deleteFile(backupDir, el));
@@ -142,7 +144,11 @@ app.post("/", async (req, res) => {
     ...downloadFilePromises(),
     ...deleteFilePromises(),
   ]);
-  console.log("Backup completed!", success);
+  console.log(
+    `Backup of ${success.length} ${
+      success.length < 2 ? "file" : "files"
+    } completed!`
+  );
   res.status(201).json({ success: true, msg: "Data received!" });
 });
 

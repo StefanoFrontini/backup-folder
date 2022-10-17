@@ -4,9 +4,19 @@ import axios from "axios";
 
 import path from "path";
 import express from "express";
+import localtunnel from "localtunnel";
 
 const app = express();
 const PORT = 5000;
+
+const tunnel = async () => {
+  const tunnel = await localtunnel({ port: PORT });
+
+  tunnel.on("close", () => {
+    console.log("tunnel closed");
+  });
+  return tunnel.url;
+};
 
 // Middlewares
 app.use(express.json());
@@ -31,7 +41,7 @@ const getDataToBackup = async (dir) => {
 };
 
 // routes
-app.get("/api/query", (req, res) => {
+app.get("/", (req, res) => {
   const { filePath } = req.query;
   if (!filePath) {
     return res.status(404).send("Please provide a filepath");
@@ -89,7 +99,10 @@ const sendListOfFilesToUpdate = async () => {
   // };
   // const backup = await getBackup();
   // const filesToDelete = { ...backup };
-  const dataToBackup = await getDataToBackup(dataDir);
+  const result = await Promise.all([tunnel(), getDataToBackup(dataDir)]);
+  console.log("tunnel_url:", result[0].toString());
+  // const dataToBackup = await getDataToBackup(dataDir);
+  // const tunnel_url = await tunnel();
 
   // for (let el of dataToBackup) {
   //   if (el.name in backup) {
@@ -119,7 +132,12 @@ const sendListOfFilesToUpdate = async () => {
   //     console.log("File da eliminare: ", el);
   //   }
   // }
-  const { data } = await axios.post(server_url, { data: dataToBackup });
+  const { data } = await axios.post(server_url, {
+    data: {
+      tunnel_url: result[0].toString(),
+      dataToBackup: result[1],
+    },
+  });
   console.log("Server message: ", data);
 };
 
