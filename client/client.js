@@ -44,7 +44,9 @@ const getDataToBackup = async (dir) => {
 app.get("/", (req, res) => {
   const { filePath } = req.query;
   if (!filePath) {
-    return res.status(404).send("Please provide a filepath");
+    return res
+      .status(404)
+      .json({ success: false, msg: "Please provide a filepath" });
   }
   const fileStream = createReadStream(path.join(dataDir, filePath));
   fileStream.on("open", () => {
@@ -62,6 +64,55 @@ app.listen(PORT, () => {
   console.log(`Listening on port ${PORT}`);
 });
 
+const sendListOfFilesToUpdate = async () => {
+  let now = new Date();
+  try {
+    const result = await Promise.all([tunnel(), getDataToBackup(dataDir)]);
+    console.log("tunnel_url:", result[0].toString());
+    try {
+      const { data } = await axios.post(server_url, {
+        data: {
+          tunnel_url: result[0].toString(),
+          dataToBackup: result[1],
+        },
+      });
+      const backupTime = new Date() - now;
+      console.log({
+        ...data,
+        msg:
+          data.msg + " - Backup eseguito in: " + backupTime / 1000 + " secondi",
+      });
+      // console.log(`Backup completato``)
+    } catch (error) {
+      if (error.code === "ECONNREFUSED") {
+        console.log("Connessione al server non riuscita!");
+      } else if (error.response.data) {
+        console.log(error.response.data);
+      } else {
+        console.log("Error:", error);
+      }
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
+
+sendListOfFilesToUpdate();
+
+// const options = {
+//   year: "numeric",
+//   month: "numeric",
+//   day: "numeric",
+//   hour: "numeric",
+//   minute: "numeric",
+//   second: "numeric",
+// };
+// const formatDate = (date) => {
+//   return new Intl.DateTimeFormat("it-IT", options).format(new Date(date));
+// };
+// atime - time of last access
+// mtime - time of last modification
+// ctime - time of last status change
 // const writeJson = async (dir, data) => {
 //   try {
 //     await writeFile(path.join(dir, "backup.json"), JSON.stringify(data));
@@ -91,69 +142,3 @@ app.listen(PORT, () => {
 //     console.error(error);
 //   }
 // };
-
-const sendListOfFilesToUpdate = async () => {
-  // const filesToSend = {
-  //   filesToUpdate: [],
-  //   filesToDelete: [],
-  // };
-  // const backup = await getBackup();
-  // const filesToDelete = { ...backup };
-  const result = await Promise.all([tunnel(), getDataToBackup(dataDir)]);
-  console.log("tunnel_url:", result[0].toString());
-  // const dataToBackup = await getDataToBackup(dataDir);
-  // const tunnel_url = await tunnel();
-
-  // for (let el of dataToBackup) {
-  //   if (el.name in backup) {
-  //     delete filesToDelete[el.name];
-  //   }
-  //   if (
-  //     el.name in backup &&
-  //     new Date(el.mtime) > new Date(backup[el.name].mtime)
-  //   ) {
-  //     filesToSend.filesToUpdate.push(el.name);
-  //     console.log(
-  //       `Trovato nuovo file più aggiornato: ${el.name} - ${
-  //         el.mtime
-  //       } - backup: ${backup[el.name].mtime}`
-  //     );
-  //   }
-  //   if (!(el.name in backup)) {
-  //     filesToSend.filesToUpdate.push(el.name);
-  //     console.log(`Trovato nuovo file: ${el.name}`);
-  //   }
-  // }
-  // const keysToDelete = Object.keys(filesToDelete);
-  // if (keysToDelete.length > 0) {
-  //   for (let el of keysToDelete) {
-  //     filesToSend.filesToDelete.push(el);
-  //     // deleteFile(myBackupDir, el);
-  //     console.log("File da eliminare: ", el);
-  //   }
-  // }
-  const { data } = await axios.post(server_url, {
-    data: {
-      tunnel_url: result[0].toString(),
-      dataToBackup: result[1],
-    },
-  });
-  console.log("Server message: ", data);
-};
-
-sendListOfFilesToUpdate();
-
-// const options = {
-//   year: "numeric",
-//   month: "numeric",
-//   day: "numeric",
-//   hour: "numeric",
-//   minute: "numeric",
-//   second: "numeric",
-// };
-// const formatDate = (date) => {
-//   return new Intl.DateTimeFormat("it-IT", options).format(new Date(date));
-// };
-// atime - time of last access
-// mtime - time of last modification
-// ctime - time of last status change

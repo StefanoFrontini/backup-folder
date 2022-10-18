@@ -4,6 +4,7 @@ import express from "express";
 import axios from "axios";
 
 import { statSync, createWriteStream } from "fs";
+import { nextTick } from "process";
 
 // import * as stream from "stream";
 // import { promisify } from "util";
@@ -13,7 +14,7 @@ import { statSync, createWriteStream } from "fs";
 const app = express();
 const PORT = 3000;
 
-const client_url = "http://localhost:5000/api/query";
+// const client_url = "http://localhost:5000/api/query";
 
 const backupDir = "backup";
 
@@ -38,17 +39,20 @@ const getBackup = async (dir) => {
 // const copyFile = async (src, dest) => {
 //   await fs.promises.copyFile(src, dest);
 // };
-const deleteFile = async (dir, file) => {
+const deleteFile = async (dir, file, res) => {
   try {
     await unlink(path.join(dir, file));
     console.log(`File deleted! - ${file}`);
     return file;
   } catch (error) {
-    console.error(error);
+    res
+      .sendStatus(400)
+      .json({ success: false, msg: `Cancellazione del ${file} non riuscita!` });
+    throw new Error(`Cancellazione del file non riuscita! - ${file}`);
   }
 };
 
-const downloadFile = async (file, url) => {
+const downloadFile = async (file, url, res) => {
   try {
     const { data } = await axios({
       url,
@@ -67,11 +71,11 @@ const downloadFile = async (file, url) => {
 
       writer.on("error", () => {
         console.log(`Something went wrong - File not saved! - ${file}`);
-        reject("Rejected!");
+        reject(`Something went wrong - File not saved! - ${file}`);
       });
     });
   } catch (error) {
-    console.log(error.response);
+    throw new Error(`Download del file: ${file} non riuscito!`);
   }
 };
 // routes
@@ -83,7 +87,7 @@ app.post("/", async (req, res) => {
   if (!data) {
     return res
       .status(400)
-      .json({ success: false, msg: "Non è stato inviato alcun dato" });
+      .json({ success: false, msg: "Non è stato inviato alcun dato!" });
   }
   const tunnel_url = data.tunnel_url;
   console.log({ tunnel_url });
@@ -133,29 +137,48 @@ app.post("/", async (req, res) => {
     }
   }
   const downloadFilePromises = () =>
-    filesToChange.filesToUpdate.map((el) => downloadFile(el, tunnel_url));
+    filesToChange.filesToUpdate.map((el) => downloadFile(el, tunnel_url, res));
 
   const deleteFilePromises = () =>
-    filesToChange.filesToDelete.map((el) => deleteFile(backupDir, el));
+    filesToChange.filesToDelete.map((el) => deleteFile(backupDir, el, res));
 
   console.log("Files to change: ", filesToChange);
 
-  const success = await Promise.all([
-    ...downloadFilePromises(),
-    ...deleteFilePromises(),
-  ]);
-  console.log(
-    `Backup of ${success.length} ${
-      success.length < 2 ? "file" : "files"
-    } completed!`
-  );
-  res.status(201).json({ success: true, msg: "Data received!" });
+  try {
+    const result = await Promise.all([
+      ...downloadFilePromises(),
+      ...deleteFilePromises(),
+    ]);
+    console.log(
+      `Backup di ${result.length} ${
+        result.length < 2 ? "file" : "files"
+      } completato!`
+    );
+
+    return res.status(201).json({
+      success: true,
+      msg: `Backup di ${result.length} ${
+        result.length < 2 ? "file" : "files"
+      } completato!`,
+    });
+  } catch (error) {
+    console.error(`Backup non riuscito! - ${error}`);
+    res.status(400).json({
+      success: false,
+      msg: `Backup non riuscito! - ${error}`,
+    });
+    // next(error);
+  }
 });
 
 app.listen(PORT, () => {
   console.log(`Listening on port ${PORT}`);
 });
 
+// throw new Error(`Backup non riuscito!`);
+// res
+//   .sendStatus(400)
+//   .json({ success: false, msg: "Backup non riuscito Ste!" });
 // const socket = net.connect(8000);
 
 // let fileStream = fs.createWriteStream(
