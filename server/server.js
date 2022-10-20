@@ -1,174 +1,20 @@
-import { unlink, readdir } from "fs/promises";
-import path from "path";
 import express from "express";
-import axios from "axios";
-
-import { statSync, createWriteStream } from "fs";
-import { nextTick } from "process";
-
-// import * as stream from "stream";
-// import { promisify } from "util";
-
-// const finished = promisify(stream.finished);
+import api from "./routes/api.js";
 
 const app = express();
 const PORT = 3000;
 
-// const client_url = "http://localhost:5000/api/query";
-
-const backupDir = "backup";
-
 // Middlewares
 app.use(express.json());
-
-const getBackup = async (dir) => {
-  try {
-    const files = await readdir(dir);
-    return files.map((file) => {
-      return {
-        name: file,
-        mtime: new Date(statSync(path.join(dir, file)).mtime),
-        //size: statSync(`${dir}/${file}`).size,
-      };
-    });
-  } catch (error) {
-    console.error(error);
-  }
-};
+app.use("/api", api);
 
 // const copyFile = async (src, dest) => {
 //   await fs.promises.copyFile(src, dest);
 // };
-const deleteFile = async (dir, file, res) => {
-  try {
-    await unlink(path.join(dir, file));
-    console.log(`File deleted! - ${file}`);
-    return file;
-  } catch (error) {
-    res
-      .sendStatus(400)
-      .json({ success: false, msg: `Cancellazione del ${file} non riuscita!` });
-    throw new Error(`Cancellazione del file non riuscita! - ${file}`);
-  }
-};
 
-const downloadFile = async (file, url, res) => {
-  try {
-    const { data } = await axios({
-      url,
-      method: "GET",
-      responseType: "stream",
-      params: { filePath: file },
-    });
-    const writer = createWriteStream(path.join(backupDir, file));
-    data.pipe(writer);
-
-    return new Promise((resolve, reject) => {
-      writer.on("finish", () => {
-        console.log(`File received and saved! - ${file}`);
-        resolve(file);
-      });
-
-      writer.on("error", () => {
-        console.log(`Something went wrong - File not saved! - ${file}`);
-        reject(`Something went wrong - File not saved! - ${file}`);
-      });
-    });
-  } catch (error) {
-    throw new Error(`Download del file: ${file} non riuscito!`);
-  }
-};
 // routes
 app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-app.post("/", async (req, res) => {
-  let { data } = req.body;
-  if (!data) {
-    return res
-      .status(400)
-      .json({ success: false, msg: "Non è stato inviato alcun dato!" });
-  }
-  const tunnel_url = data.tunnel_url;
-  console.log({ tunnel_url });
-  data = data.dataToBackup.filter((el) => el.name !== ".DS_Store");
-  const filesToChange = {
-    filesToUpdate: [],
-    filesToDelete: [],
-  };
-  let backupArray = await getBackup(backupDir);
-  backupArray = backupArray.filter((el) => el.name !== ".DS_Store");
-
-  const backup = {};
-  for (let el of backupArray) {
-    backup[el.name] = {
-      name: el.name,
-      mtime: el.mtime,
-    };
-  }
-
-  const filesToDelete = { ...backup };
-  for (let el of data) {
-    if (el.name in backup) {
-      delete filesToDelete[el.name];
-    }
-    if (
-      el.name in backup &&
-      el.name &&
-      new Date(el.mtime) > new Date(backup[el.name].mtime)
-    ) {
-      filesToChange.filesToUpdate.push(el.name);
-      console.log(
-        `Trovato nuovo file più aggiornato: ${el.name} - ${
-          el.mtime
-        } - backup: ${backup[el.name].mtime}`
-      );
-    }
-    if (!(el.name in backup) && el.name) {
-      filesToChange.filesToUpdate.push(el.name);
-      console.log(`Trovato nuovo file: ${el.name}`);
-    }
-  }
-  const keysToDelete = Object.keys(filesToDelete);
-  if (keysToDelete.length > 0) {
-    for (let el of keysToDelete) {
-      filesToChange.filesToDelete.push(el);
-      // deleteFile(myBackupDir, el);
-    }
-  }
-  const downloadFilePromises = () =>
-    filesToChange.filesToUpdate.map((el) => downloadFile(el, tunnel_url, res));
-
-  const deleteFilePromises = () =>
-    filesToChange.filesToDelete.map((el) => deleteFile(backupDir, el, res));
-
-  console.log("Files to change: ", filesToChange);
-
-  try {
-    const result = await Promise.all([
-      ...downloadFilePromises(),
-      ...deleteFilePromises(),
-    ]);
-    console.log(
-      `Backup di ${result.length} ${
-        result.length < 2 ? "file" : "files"
-      } completato!`
-    );
-
-    return res.status(201).json({
-      success: true,
-      msg: `Backup di ${result.length} ${
-        result.length < 2 ? "file" : "files"
-      } completato!`,
-    });
-  } catch (error) {
-    console.error(`Backup non riuscito! - ${error}`);
-    res.status(400).json({
-      success: false,
-      msg: `Backup non riuscito! - ${error}`,
-    });
-    // next(error);
-  }
+  res.send("Backup server!");
 });
 
 app.listen(PORT, () => {
