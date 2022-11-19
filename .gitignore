@@ -1,8 +1,11 @@
 client/dataToBackup
 client/json
 client/node_modules
+client/package-lock.json
 server/backup
 server/node_modules
+server/package-lock.json
 .DS_Store
 client/.DS_Store
 server/.DS_Store
+backup.zip
